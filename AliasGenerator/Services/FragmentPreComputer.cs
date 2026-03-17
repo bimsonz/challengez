@@ -19,62 +19,58 @@ public static class FragmentPreComputer
     /// Validates account names and numbers during computation.
     /// </summary>
     public static Dictionary<string, string> ComputeAccountFragments(IReadOnlyList<Account> accounts)
-    {
-        var fragments = new Dictionary<string, string>(accounts.Count);
-
-        foreach (var account in accounts)
-        {
-            if (account.AccountNumber.Length != RequiredAccountNumberLength)
-            {
-                throw new InvalidOperationException(
-                    $"Account number '{account.AccountNumber}' must be exactly " +
-                    $"{RequiredAccountNumberLength} digits.");
-            }
-
-            var strippedName = account.Name
-                .Replace(" ", "", StringComparison.Ordinal)
-                .Replace("-", "", StringComparison.Ordinal);
-
-            if (strippedName.Length < MinStrippedNameLength)
-            {
-                throw new InvalidOperationException(
-                    $"Account '{account.AccountNumber}' name '{account.Name}' yields fewer than " +
-                    $"{MinStrippedNameLength} letters after removing spaces and hyphens (got '{strippedName}').");
-            }
-
-            var suffix = account.AccountType switch
-            {
-                AccountType.Standard => "-ST",
-                AccountType.Suspense => "-SU",
-                _ => throw new ArgumentOutOfRangeException(
-                    nameof(account.AccountType),
-                    account.AccountType,
-                    $"Unknown AccountType: {account.AccountType}")
-            };
-
-            fragments[account.AccountNumber] = string.Concat(
-                account.Currency,
-                strippedName.AsSpan(0, 4),
-                account.AccountNumber.AsSpan(account.AccountNumber.Length - 4),
-                suffix);
-        }
-
-        return fragments;
-    }
+        => accounts.ToDictionary(
+            a => a.AccountNumber,
+            ComputeAccountFragment);
 
     /// <summary>
     /// Pre-compute the counterparty portion of each alias: {Code}{Jurisdiction}_.
     /// Each counterparty is processed exactly once regardless of how many mappings reference it.
     /// </summary>
     public static Dictionary<string, string> ComputeCounterpartyPrefixes(IReadOnlyList<Counterparty> counterparties)
-    {
-        var prefixes = new Dictionary<string, string>(counterparties.Count);
+        => counterparties.ToDictionary(
+            cp => cp.Code,
+            cp => $"{cp.Code}{cp.Jurisdiction}_");
 
-        foreach (var cp in counterparties)
+    /// <summary>
+    /// Compute the account fragment for a single account: {Currency}{First4Letters}{Last4Digits}{TypeSuffix}.
+    /// Validates account number length and stripped name length.
+    /// Pure function — no shared state, safe to call in parallel if needed.
+    /// </summary>
+    private static string ComputeAccountFragment(Account account)
+    {
+        if (account.AccountNumber.Length != RequiredAccountNumberLength)
         {
-            prefixes[cp.Code] = $"{cp.Code}{cp.Jurisdiction}_";
+            throw new InvalidOperationException(
+                $"Account number '{account.AccountNumber}' must be exactly " +
+                $"{RequiredAccountNumberLength} digits.");
         }
 
-        return prefixes;
+        var strippedName = account.Name
+            .Replace(" ", "", StringComparison.Ordinal)
+            .Replace("-", "", StringComparison.Ordinal);
+
+        if (strippedName.Length < MinStrippedNameLength)
+        {
+            throw new InvalidOperationException(
+                $"Account '{account.AccountNumber}' name '{account.Name}' yields fewer than " +
+                $"{MinStrippedNameLength} letters after removing spaces and hyphens (got '{strippedName}').");
+        }
+
+        var suffix = account.AccountType switch
+        {
+            AccountType.Standard => "-ST",
+            AccountType.Suspense => "-SU",
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(account.AccountType),
+                account.AccountType,
+                $"Unknown AccountType: {account.AccountType}")
+        };
+
+        return string.Concat(
+            account.Currency,
+            strippedName.AsSpan(0, 4),
+            account.AccountNumber.AsSpan(account.AccountNumber.Length - 4),
+            suffix);
     }
 }

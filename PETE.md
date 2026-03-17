@@ -78,3 +78,29 @@ The pre-computation itself is roughly neutral: at 10K mappings, building fragmen
 Reverted Phase 2 to a plain sequential `for` loop. Kept the pre-computation and all other architectural improvements (extracted services, merged validation, IReadOnlyList, stderr separation, buffered output) because they are genuinely better code regardless of performance — the pre-computation eliminates a correctness risk (duplicate stripping logic), and the code reads more clearly.
 
 The parallelism exploration was valuable: it proved through measurement that the naive approach was correct for this workload shape, and it demonstrated understanding of when parallelism helps (CPU-expensive per-item work) vs when it hurts (trivial per-item work where scheduling overhead dominates). Knowing when not to optimise is the point.
+
+## Commit 7: `refactor: LINQ review — ToDictionary and merge phases`
+
+**Mode: Targeted LINQ review**
+
+Having discovered PLINQ during the parallelism exploration, I wanted to make sure we were using LINQ properly across the whole solution — not just for parallelism, but for expressiveness and idiomatic style.
+
+Deep review found the codebase was mostly clean, with two improvements:
+
+- **`ComputeCounterpartyPrefixes`** was reinventing `.ToDictionary()` — a 5-line foreach replaced with a single expression. Bonus: `.ToDictionary()` throws on duplicate keys rather than silently overwriting, which is better fail-fast behaviour.
+- **Phases 2 and 3 in `AliasGeneratorService`** were separate sequential loops with an intermediate `baseAliases[]` array that was consumed immediately and never reused. Merged into a single `foreach` — eliminates the array allocation and reads more naturally.
+
+Deliberately did NOT convert the merged loop to LINQ `.Select()` because `AliasResolver.Resolve` mutates `aliasCounts` — side effects inside `Select` is a LINQ anti-pattern that would silently break if someone later added `.AsParallel()`.
+
+### Benchmark Impact
+
+| Version | 208 mappings | 10K mappings |
+|---|---|---|
+| Commit 6: pre-computation + plain sequential | ~1.2ms | ~13ms |
+| This: merged loop + ToDictionary | ~1.6ms | ~14ms |
+
+Roughly a wash — the merge eliminates an array allocation but `.ToDictionary()` loses the capacity pre-hint. The value here is readability and correctness, not speed.
+
+After the initial LINQ changes, I questioned whether the `ComputeAccountFragments` foreach loop — which we'd left alone because the body was "too complex for LINQ" — was actually a missed PLINQ candidate. The per-account work is independent and stateless, so parallelism is technically valid. But the same fundamental problem applies: per-account work is nanoseconds (two `.Replace()` calls, a length check, a switch, one `string.Concat`). At 100–1000 accounts, total computation is 5–100μs. PLINQ's thread-pool overhead would dwarf it. There's also a practical issue: PLINQ wraps exceptions in `AggregateException`, which would break our test assertions for `InvalidOperationException`.
+
+What we did instead: extracted the per-account logic into a `ComputeAccountFragment` method and used plain `.ToDictionary()` — consistent with how `ComputeCounterpartyPrefixes` is written. The extracted method is documented as a pure function, safe to call in parallel if the workload ever justified it. Both dictionary-building methods now use the same pattern.
