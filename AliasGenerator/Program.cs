@@ -4,12 +4,14 @@ using System.Text.Json.Serialization;
 using AliasGenerator;
 using AliasGenerator.Models;
 
-var path = args.Length > 0 ? args[0] : "data.json";
+if (args is not [var path, ..])
+{
+    throw new ArgumentException("Usage: AliasGenerator <path-to-input-file>");
+}
 
 if (!File.Exists(path))
 {
-    Console.Error.WriteLine($"File not found: {path}");
-    return 1;
+    throw new FileNotFoundException($"Input file not found: {path}", path);
 }
 
 var options = new JsonSerializerOptions
@@ -19,8 +21,12 @@ var options = new JsonSerializerOptions
 };
 
 await using var stream = File.OpenRead(path);
-var data = await JsonSerializer.DeserializeAsync<DataStore>(stream, options)
-    ?? throw new InvalidOperationException("Failed to deserialise data file.");
+var data = await JsonSerializer.DeserializeAsync<DataStore>(stream, options);
+
+if (data is null)
+{
+    throw new InvalidOperationException("Failed to deserialise data file.");
+}
 
 Console.WriteLine($"Loaded {data.Accounts.Count} accounts, {data.Counterparties.Count} counterparties, {data.Mappings.Count} mappings.");
 
@@ -33,7 +39,16 @@ stopwatch.Stop();
 Console.WriteLine($"[END]   {DateTime.UtcNow:O}");
 Console.WriteLine($"[TIME]  {stopwatch.Elapsed.TotalMicroseconds:F0}μs ({stopwatch.ElapsedMilliseconds}ms)");
 
+using var writer = new StreamWriter(Console.OpenStandardOutput(), leaveOpen: true);
+writer.AutoFlush = false;
+
 foreach (var result in results)
-    Console.WriteLine($"{result.CounterpartyCode},{result.AccountNumber},{result.Alias}");
+{
+    writer.Write(result.CounterpartyCode);
+    writer.Write(',');
+    writer.Write(result.AccountNumber);
+    writer.Write(',');
+    writer.WriteLine(result.Alias);
+}
 
 return 0;
