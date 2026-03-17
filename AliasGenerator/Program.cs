@@ -28,16 +28,16 @@ if (data is null)
     throw new InvalidOperationException("Failed to deserialise data file.");
 }
 
-Console.WriteLine($"Loaded {data.Accounts.Count} accounts, {data.Counterparties.Count} counterparties, {data.Mappings.Count} mappings.");
+Console.Error.WriteLine($"Loaded {data.Accounts.Count} accounts, {data.Counterparties.Count} counterparties, {data.Mappings.Count} mappings.");
 
-Console.WriteLine($"[START] {DateTime.UtcNow:O}");
+Console.Error.WriteLine($"[START] {DateTime.UtcNow:O}");
 var stopwatch = Stopwatch.StartNew();
 
 var results = Solver.GenerateAliases(data);
 
 stopwatch.Stop();
-Console.WriteLine($"[END]   {DateTime.UtcNow:O}");
-Console.WriteLine($"[TIME]  {stopwatch.Elapsed.TotalMicroseconds:F0}μs ({stopwatch.ElapsedMilliseconds}ms)");
+Console.Error.WriteLine($"[END]   {DateTime.UtcNow:O}");
+Console.Error.WriteLine($"[TIME]  {stopwatch.Elapsed.TotalMicroseconds:F0}μs ({stopwatch.ElapsedMilliseconds}ms)");
 
 using var writer = new StreamWriter(Console.OpenStandardOutput(), leaveOpen: true);
 writer.AutoFlush = false;

@@ -37,3 +37,17 @@ The difference between commits 2 and 3 is the difference between "technically op
 During my review I noticed the hardcoded `ParallelThreshold = 1_000` constant that switched between `Parallel.For` and a sequential loop. It didn't sit right — it felt like a magic number, not portable across machines, and duplicated the loop body in two code paths. I asked Claude to research whether .NET has an idiomatic solution for this. Turns out PLINQ is exactly that: its runtime heuristics analyse query shape and decide whether to parallelise automatically, falling back to sequential for small datasets without any threshold. Replaced the entire `BuildBaseAliases` method and its magic constant with a single PLINQ expression. The service went from ~90 lines to ~50.
 
 This is the kind of thing where knowing something feels wrong is the human skill, but digging into the ecosystem to find the right answer is where AI research shines.
+
+## Commit 5: `fix: final idiomatic review — stderr, immutability, validation`
+
+**Mode: AI review with human judgment on trade-offs**
+
+Ran a full idiomatic .NET review for performance, security, and correctness. The review flagged several genuine issues:
+
+- **Diagnostics on stdout corrupted piped output** — `Console.WriteLine` for timing and "Loaded..." messages mixed with CSV data. Moved all diagnostics to `Console.Error` so `> results.csv` captures only data. Standard Unix convention.
+- **Duplicate name stripping** — `DataValidator` stripped account names for validation, then `FragmentPreComputer` stripped them again for fragment computation. If someone changed the logic in one place but not the other, validation and generation would silently diverge. Merged validation into fragment computation — stripping now happens exactly once per account.
+- **`List<T>` in `DataStore` record** — records imply immutability but `List<T>` is mutable. Changed to `IReadOnlyList<T>` across the model and all consuming methods.
+- **No `AccountNumber` format validation** — the `AsSpan` slice would throw with no domain context if an account number was too short. Added validation during fragment computation.
+- **Residual `.ToList()` in `SolverTests`** — leftover from before we changed the return type.
+
+The review also flagged PLINQ as overhead at 208 items (~5-17ms vs ~1ms sequential). This is a deliberate trade-off: at this dataset size, a plain loop is faster. But the PLINQ approach is architecturally correct for production — the runtime owns the parallelism decision rather than a hardcoded magic number. For a tech test, demonstrating that you understand the trade-off and can articulate why you made the choice matters more than shaving milliseconds off a sub-second operation.

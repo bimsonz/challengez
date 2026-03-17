@@ -12,7 +12,7 @@ public class SolverTests
             [new Counterparty("testcounterpartynamepadding123", "ABCD", "GB")],
             [new AccountMapping("12345678", "ABCD")]);
 
-        var results = Solver.GenerateAliases(data).ToList();
+        var results = Solver.GenerateAliases(data);
 
         var result = Assert.Single(results);
         Assert.Equal("ABCDGB_USDtest5678-ST", result.Alias);
@@ -32,7 +32,7 @@ public class SolverTests
                 new AccountMapping("22222222", "WXYZ")
             ]);
 
-        var results = Solver.GenerateAliases(data).ToList();
+        var results = Solver.GenerateAliases(data);
 
         Assert.Equal(2, results.Count);
         Assert.Equal("WXYZUS_GBPalph1111-ST", results[0].Alias);

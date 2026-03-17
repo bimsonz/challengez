@@ -1,7 +1,7 @@
 namespace AliasGenerator.Models;
 
 public record DataStore(
-    List<Account> Accounts,
-    List<Counterparty> Counterparties,
-    List<AccountMapping> Mappings
+    IReadOnlyList<Account> Accounts,
+    IReadOnlyList<Counterparty> Counterparties,
+    IReadOnlyList<AccountMapping> Mappings
 );

@@ -17,8 +17,7 @@ public sealed class AliasGeneratorService : IAliasGenerator
             return [];
         }
 
-        // Phase 1: validate all entities and pre-compute reusable fragments
-        DataValidator.ValidateAccountNames(data.Accounts);
+        // Phase 1: validate and pre-compute reusable fragments (validation happens during computation)
         var accountFragments = FragmentPreComputer.ComputeAccountFragments(data.Accounts);
         var counterpartyPrefixes = FragmentPreComputer.ComputeCounterpartyPrefixes(data.Counterparties);
         DataValidator.ValidateMappings(data.Mappings, accountFragments, counterpartyPrefixes);
