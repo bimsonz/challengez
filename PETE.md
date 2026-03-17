@@ -29,3 +29,11 @@ My manual pass through the code. This is where experience and taste come in — 
 - Switched output loop from per-line `Console.WriteLine` with string interpolation to buffered `StreamWriter` with direct writes
 
 The difference between commits 2 and 3 is the difference between "technically optimal" and "code I'd want to maintain." AI gets the algorithm right but doesn't have opinions about code organisation, brace style, or what feels wrong when you read it. That's the human layer.
+
+## Commit 4: `refactor: replace hardcoded parallel threshold with PLINQ`
+
+**Mode: Human-initiated research with AI execution**
+
+During my review I noticed the hardcoded `ParallelThreshold = 1_000` constant that switched between `Parallel.For` and a sequential loop. It didn't sit right — it felt like a magic number, not portable across machines, and duplicated the loop body in two code paths. I asked Claude to research whether .NET has an idiomatic solution for this. Turns out PLINQ is exactly that: its runtime heuristics analyse query shape and decide whether to parallelise automatically, falling back to sequential for small datasets without any threshold. Replaced the entire `BuildBaseAliases` method and its magic constant with a single PLINQ expression. The service went from ~90 lines to ~50.
+
+This is the kind of thing where knowing something feels wrong is the human skill, but digging into the ecosystem to find the right answer is where AI research shines.

@@ -8,13 +8,6 @@ namespace AliasGenerator.Services;
 /// </summary>
 public sealed class AliasGeneratorService : IAliasGenerator
 {
-    /// <summary>
-    /// Threshold below which sequential processing outperforms parallel.
-    /// At small mapping counts, thread-pool dispatch overhead (~1-5μs per work item)
-    /// exceeds the per-item work (~10-50ns for a string.Concat of pre-computed parts).
-    /// </summary>
-    private const int ParallelThreshold = 1_000;
-
     public IReadOnlyList<AliasResult> GenerateAliases(DataStore data)
     {
         ArgumentNullException.ThrowIfNull(data);
@@ -30,8 +23,15 @@ public sealed class AliasGeneratorService : IAliasGenerator
         var counterpartyPrefixes = FragmentPreComputer.ComputeCounterpartyPrefixes(data.Counterparties);
         DataValidator.ValidateMappings(data.Mappings, accountFragments, counterpartyPrefixes);
 
-        // Phase 2: build base aliases — stateless per iteration, safe to parallelise
-        var baseAliases = BuildBaseAliases(data.Mappings, accountFragments, counterpartyPrefixes);
+        // Phase 2: build base aliases — PLINQ decides whether to parallelise based on
+        // query shape and runtime heuristics, avoiding a hardcoded threshold
+        var baseAliases = data.Mappings
+            .AsParallel()
+            .AsOrdered()
+            .Select(m => string.Concat(
+                counterpartyPrefixes[m.CounterpartyCode],
+                accountFragments[m.AccountNumber]))
+            .ToArray();
 
         // Phase 3: resolve duplicates (must be sequential — suffix numbering depends on encounter order)
         var aliasCounts = new Dictionary<string, int>(data.Mappings.Count);
@@ -47,42 +47,5 @@ public sealed class AliasGeneratorService : IAliasGenerator
         }
 
         return results;
-    }
-
-    /// <summary>
-    /// Build base alias strings from pre-computed fragments. Uses <see cref="Parallel.For"/>
-    /// when the mapping count exceeds <see cref="ParallelThreshold"/>, as each iteration
-    /// reads from immutable dictionaries and writes to its own array index (zero contention).
-    /// Falls back to sequential for small datasets where thread-pool overhead dominates.
-    /// </summary>
-    private static string[] BuildBaseAliases(
-        List<AccountMapping> mappings,
-        Dictionary<string, string> accountFragments,
-        Dictionary<string, string> counterpartyPrefixes)
-    {
-        var baseAliases = new string[mappings.Count];
-
-        if (mappings.Count >= ParallelThreshold)
-        {
-            Parallel.For(0, mappings.Count, i =>
-            {
-                var mapping = mappings[i];
-                baseAliases[i] = string.Concat(
-                    counterpartyPrefixes[mapping.CounterpartyCode],
-                    accountFragments[mapping.AccountNumber]);
-            });
-
-            return baseAliases;
-        }
-
-        for (var i = 0; i < mappings.Count; i++)
-        {
-            var mapping = mappings[i];
-            baseAliases[i] = string.Concat(
-                counterpartyPrefixes[mapping.CounterpartyCode],
-                accountFragments[mapping.AccountNumber]);
-        }
-
-        return baseAliases;
     }
 }

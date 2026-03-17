@@ -50,5 +50,3 @@ foreach (var result in results)
     writer.Write(',');
     writer.WriteLine(result.Alias);
 }
-
-return 0;
