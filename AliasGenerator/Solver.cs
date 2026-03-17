@@ -15,7 +15,7 @@ public static class Solver
     /// A collection of <see cref="AliasResult"/> — one per mapping,
     /// with duplicates resolved by appending a numeric suffix.
     /// </returns>
-    public static IEnumerable<AliasResult> GenerateAliases(DataStore data)
+    public static IReadOnlyList<AliasResult> GenerateAliases(DataStore data)
     {
         return Generator.GenerateAliases(data);
     }

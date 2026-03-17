@@ -236,6 +236,30 @@ public class AliasGeneratorServiceTests
     }
 
     [Fact]
+    public void GenerateAliases_MappingReferencesUnknownAccount_ThrowsInvalidOperationException()
+    {
+        var data = CreateDataStore(
+            [MakeAccount()],
+            [MakeCounterparty()],
+            [new AccountMapping("99999999", "ABCD")]);
+
+        var ex = Assert.Throws<InvalidOperationException>(() => _sut.GenerateAliases(data));
+        Assert.Contains("unknown account number", ex.Message);
+    }
+
+    [Fact]
+    public void GenerateAliases_MappingReferencesUnknownCounterparty_ThrowsInvalidOperationException()
+    {
+        var data = CreateDataStore(
+            [MakeAccount()],
+            [MakeCounterparty()],
+            [new AccountMapping("12345678", "ZZZZ")]);
+
+        var ex = Assert.Throws<InvalidOperationException>(() => _sut.GenerateAliases(data));
+        Assert.Contains("unknown counterparty code", ex.Message);
+    }
+
+    [Fact]
     public void GenerateAliases_PreservesMappingOrder()
     {
         var data = CreateDataStore(

@@ -27,11 +27,11 @@ Console.WriteLine($"Loaded {data.Accounts.Count} accounts, {data.Counterparties.
 Console.WriteLine($"[START] {DateTime.UtcNow:O}");
 var stopwatch = Stopwatch.StartNew();
 
-var results = Solver.GenerateAliases(data).ToList();
+var results = Solver.GenerateAliases(data);
 
 stopwatch.Stop();
 Console.WriteLine($"[END]   {DateTime.UtcNow:O}");
-Console.WriteLine($"[TIME]  {stopwatch.ElapsedMilliseconds}ms");
+Console.WriteLine($"[TIME]  {stopwatch.Elapsed.TotalMicroseconds:F0}μs ({stopwatch.ElapsedMilliseconds}ms)");
 
 foreach (var result in results)
     Console.WriteLine($"{result.CounterpartyCode},{result.AccountNumber},{result.Alias}");
