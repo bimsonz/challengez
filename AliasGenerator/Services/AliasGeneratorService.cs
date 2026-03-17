@@ -22,15 +22,16 @@ public sealed class AliasGeneratorService : IAliasGenerator
         var counterpartyPrefixes = FragmentPreComputer.ComputeCounterpartyPrefixes(data.Counterparties);
         DataValidator.ValidateMappings(data.Mappings, accountFragments, counterpartyPrefixes);
 
-        // Phase 2: build base aliases — PLINQ decides whether to parallelise based on
-        // query shape and runtime heuristics, avoiding a hardcoded threshold
-        var baseAliases = data.Mappings
-            .AsParallel()
-            .AsOrdered()
-            .Select(m => string.Concat(
-                counterpartyPrefixes[m.CounterpartyCode],
-                accountFragments[m.AccountNumber]))
-            .ToArray();
+        // Phase 2: build base aliases from pre-computed fragments
+        var baseAliases = new string[data.Mappings.Count];
+
+        for (var i = 0; i < data.Mappings.Count; i++)
+        {
+            var mapping = data.Mappings[i];
+            baseAliases[i] = string.Concat(
+                counterpartyPrefixes[mapping.CounterpartyCode],
+                accountFragments[mapping.AccountNumber]);
+        }
 
         // Phase 3: resolve duplicates (must be sequential — suffix numbering depends on encounter order)
         var aliasCounts = new Dictionary<string, int>(data.Mappings.Count);

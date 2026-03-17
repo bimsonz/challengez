@@ -51,3 +51,30 @@ Ran a full idiomatic .NET review for performance, security, and correctness. The
 - **Residual `.ToList()` in `SolverTests`** — leftover from before we changed the return type.
 
 The review also flagged PLINQ as overhead at 208 items (~5-17ms vs ~1ms sequential). This is a deliberate trade-off: at this dataset size, a plain loop is faster. But the PLINQ approach is architecturally correct for production — the runtime owns the parallelism decision rather than a hardcoded magic number. For a tech test, demonstrating that you understand the trade-off and can articulate why you made the choice matters more than shaving milliseconds off a sub-second operation.
+
+## Commit 6: `perf: revert to sequential — benchmarks prove parallelism loses at every scale`
+
+**Mode: Data-driven decision**
+
+Generated a 10K-mapping dataset (1,000 accounts, 30 counterparties, 41 planted duplicate collisions) and benchmarked every version of the code against both the original 208-mapping dataset and the 10K dataset. Then did a cross-sectional analysis isolating each change to find the optimal combination.
+
+### Benchmark Results
+
+| Version | 208 mappings | 10K mappings |
+|---|---|---|
+| Commit 1: naive sequential loop | ~1ms | ~11ms |
+| Commit 2: pre-computation + Parallel.For (threshold 1K) | ~1.4ms | ~15ms |
+| Commit 4: PLINQ + pre-computation | ~5-17ms | ~28-50ms |
+| **All fixes + plain sequential loop** | **~1.2ms** | **~13ms** |
+
+### What the Data Shows
+
+Parallelism loses at every scale we tested. The per-item work (two dictionary lookups + one `string.Concat`) is measured in nanoseconds — too cheap for any parallel dispatch overhead to recoup. PLINQ's `.AsOrdered()` constraint adds a merge step that further negates any benefit. Even `Parallel.For` with a threshold only added overhead at 10K.
+
+The pre-computation itself is roughly neutral: at 10K mappings, building fragment dictionaries for 1,000 accounts costs ~2ms upfront, and the per-mapping savings (one concat vs full strip+slice+interpolation) barely offset that because .NET 10's `DefaultInterpolatedStringHandler` is already highly optimised for small strings.
+
+### The Decision
+
+Reverted Phase 2 to a plain sequential `for` loop. Kept the pre-computation and all other architectural improvements (extracted services, merged validation, IReadOnlyList, stderr separation, buffered output) because they are genuinely better code regardless of performance — the pre-computation eliminates a correctness risk (duplicate stripping logic), and the code reads more clearly.
+
+The parallelism exploration was valuable: it proved through measurement that the naive approach was correct for this workload shape, and it demonstrated understanding of when parallelism helps (CPU-expensive per-item work) vs when it hurts (trivial per-item work where scheduling overhead dominates). Knowing when not to optimise is the point.
