@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="AliasGenerator.Tests/AliasGenerator.Tests.csproj" />
+  <Project Path="AliasGenerator/AliasGenerator.csproj" />
+</Solution>

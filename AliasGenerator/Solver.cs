@@ -1,9 +1,12 @@
 using AliasGenerator.Models;
+using AliasGenerator.Services;
 
 namespace AliasGenerator;
 
 public static class Solver
 {
+    private static readonly IAliasGenerator Generator = new AliasGeneratorService();
+
     /// <summary>
     /// Generate a unique alias for every mapped account/counterparty pair.
     /// </summary>
@@ -14,16 +17,6 @@ public static class Solver
     /// </returns>
     public static IEnumerable<AliasResult> GenerateAliases(DataStore data)
     {
-        // TODO: implement alias generation
-        throw new NotImplementedException();
+        return Generator.GenerateAliases(data);
     }
 }
-
-/// <param name="CounterpartyCode">The 4-letter counterparty code.</param>
-/// <param name="AccountNumber">The 8-digit account number.</param>
-/// <param name="Alias">The generated alias string.</param>
-public record AliasResult(
-    string CounterpartyCode,
-    string AccountNumber,
-    string Alias
-);

@@ -4,7 +4,13 @@ using System.Text.Json.Serialization;
 using AliasGenerator;
 using AliasGenerator.Models;
 
-var path = "data.json";
+var path = args.Length > 0 ? args[0] : "data.json";
+
+if (!File.Exists(path))
+{
+    Console.Error.WriteLine($"File not found: {path}");
+    return 1;
+}
 
 var options = new JsonSerializerOptions
 {
